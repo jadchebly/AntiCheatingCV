@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Proctoring</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #2563eb;
+    --ok: #15803d;
+    --bad: #b91c1c;
+    --phone: #d97706;
+    --laptop: #2563eb;
+    --chat: #7c3aed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #171a21; --ink: #e8eaed; --muted: #9aa3af;
+      --line: #272c36; --accent: #60a5fa; --ok: #4ade80; --bad: #f87171;
+      --phone: #fbbf24; --laptop: #60a5fa; --chat: #a78bfa;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 18px 80px; }
+  header { margin-bottom: 22px; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); margin: 0 0 14px; font-weight: 600;
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  select, input[type=number] {
+    width: 100%; padding: 9px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    font-size: 14px; font-family: inherit;
+  }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 200px; min-width: 0; }
+  .checks { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+  .checks label {
+    display: flex; align-items: center; gap: 7px;
+    color: var(--ink); font-size: 14px; margin: 0; cursor: pointer;
+  }
+  button {
+    font: inherit; font-weight: 550; padding: 10px 18px; border-radius: 8px;
+    border: 1px solid transparent; background: var(--accent); color: #fff;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .status { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  pre.log {
+    margin: 14px 0 0; padding: 12px; max-height: 170px; overflow: auto;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted); white-space: pre-wrap; word-break: break-word;
+  }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat {
+    flex: 1 1 120px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .stat b { display: block; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--muted); font-weight: 600;
+    padding: 0 10px 8px; border-bottom: 1px solid var(--line);
+  }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--bg); }
+  .tag {
+    display: inline-block; padding: 2px 9px; border-radius: 99px;
+    font-size: 11.5px; font-weight: 600; color: #fff;
+  }
+  .tag.cell_phone { background: var(--phone); }
+  .tag.laptop { background: var(--laptop); }
+  .tag.chatting { background: var(--chat); }
+  video { width: 100%; border-radius: 10px; background: #000; display: block; }
+  .links { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 13.5px; }
+  a { color: var(--accent); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+  .err { color: var(--bad); font-size: 13.5px; }
+  .hide { display: none !important; }
+  .empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Intelligent Exam Proctoring</h1>
+  <div class="sub">Detects phones, laptops, and chatting in classroom exam footage.</div>
+</header>
+
+<!-- ── Step 1: input ─────────────────────────────────────────────── -->
+<section class="card">
+  <h2>1 &nbsp;Video</h2>
+  <div class="row">
+    <div>
+      <label for="video">Source clip</label>
+      <select id="video"></select>
+    </div>
+    <div style="flex:0 0 auto; align-self:end;">
+      <input type="file" id="file" accept="video/*" class="hide">
+      <button class="ghost" id="uploadBtn" type="button">Upload a video</button>
+    </div>
+  </div>
+  <div class="note" id="videoNote"></div>
+</section>
+
+<!-- ── Step 2: settings + run ────────────────────────────────────── -->
+<section class="card">
+  <h2>2 &nbsp;Settings</h2>
+  <div class="row">
+    <div>
+      <label for="stride">Frame stride — higher is faster, less precise</label>
+      <input type="number" id="stride" value="4" min="1" max="30">
+    </div>
+    <div>
+      <label for="device">Compute device</label>
+      <select id="device">
+        <option value="">Auto</option>
+        <option value="mps">Apple GPU (MPS)</option>
+        <option value="cuda">NVIDIA (CUDA)</option>
+        <option value="cpu">CPU</option>
+      </select>
+    </div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="overlay" checked> Write annotated video</label>
+    <label><input type="checkbox" id="chatting" checked> Chatting detection</label>
+    <label><input type="checkbox" id="fixture" checked> Static-fixture filter</label>
+  </div>
+  <div class="actions">
+    <button id="runBtn" type="button">Run analysis</button>
+    <span class="err" id="runErr"></span>
+  </div>
+</section>
+
+<!-- ── Progress ──────────────────────────────────────────────────── -->
+<section class="card hide" id="progressCard">
+  <h2>Progress</h2>
+  <div class="status">
+    <span id="progressLabel">Starting…</span>
+    <span id="progressPct">0%</span>
+  </div>
+  <div class="bar"><div id="progressBar"></div></div>
+  <pre class="log" id="log"></pre>
+</section>
+
+<!-- ── Step 3: results ───────────────────────────────────────────── -->
+<section class="card hide" id="resultsCard">
+  <h2>3 &nbsp;Results</h2>
+  <div class="stats" id="stats"></div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Violation</th><th>Start</th><th>End</th><th>Duration</th><th>Person</th><th>Confidence</th></tr>
+      </thead>
+      <tbody id="events"></tbody>
+    </table>
+  </div>
+  <div class="empty hide" id="noEvents">No violations detected in this clip.</div>
+
+  <div class="links" id="links"></div>
+</section>
+
+<!-- ── Annotated video ───────────────────────────────────────────── -->
+<section class="card hide" id="videoCard">
+  <h2>Annotated video</h2>
+  <video id="player" controls preload="metadata"></video>
+  <div class="note">Click any row in the results table to jump to that moment.</div>
+</section>
+
+<!-- ── Evaluation ────────────────────────────────────────────────── -->
+<section class="card hide" id="evalCard">
+  <h2>Accuracy vs ground truth</h2>
+  <div class="actions" style="margin-top:0">
+    <button class="ghost" id="evalBtn" type="button">Evaluate</button>
+    <span class="err" id="evalErr"></span>
+  </div>
+  <div id="evalOut"></div>
+</section>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let videos = [];
+let jobId = null;
+let poller = null;
+
+// ── Video list ──────────────────────────────────────────────────────
+async function loadVideos(selectName) {
+  const r = await fetch('/api/videos');
+  const data = await r.json();
+  videos = data.videos;
+  const sel = $('video');
+  sel.innerHTML = '';
+  if (!videos.length) {
+    sel.innerHTML = '<option value="">No videos found</option>';
+    $('videoNote').textContent = `Drop clips into ${data.dir} or upload one above.`;
+    $('runBtn').disabled = true;
+    return;
+  }
+  for (const v of videos) {
+    const o = document.createElement('option');
+    o.value = v.name;
+    o.textContent = `${v.name}  (${v.size_mb} MB)`;
+    sel.appendChild(o);
+  }
+  if (selectName) sel.value = selectName;
+  $('runBtn').disabled = false;
+  updateVideoNote();
+}
+
+function updateVideoNote() {
+  const v = videos.find(x => x.name === $('video').value);
+  $('videoNote').textContent = v && v.has_ground_truth
+    ? 'Ground-truth annotations found — accuracy can be scored after the run.'
+    : 'No ground-truth JSON for this clip, so accuracy scoring is unavailable.';
+}
+$('video').addEventListener('change', updateVideoNote);
+
+// ── Upload ──────────────────────────────────────────────────────────
+$('uploadBtn').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', async () => {
+  const f = $('file').files[0];
+  if (!f) return;
+  $('uploadBtn').disabled = true;
+  $('uploadBtn').textContent = 'Uploading…';
+  const fd = new FormData();
+  fd.append('file', f);
+  const r = await fetch('/api/upload', { method: 'POST', body: fd });
+  const data = await r.json();
+  $('uploadBtn').disabled = false;
+  $('uploadBtn').textContent = 'Upload a video';
+  $('file').value = '';
+  if (!r.ok) { $('runErr').textContent = data.error; return; }
+  await loadVideos(data.name);
+});
+
+// ── Run ─────────────────────────────────────────────────────────────
+$('runBtn').addEventListener('click', async () => {
+  $('runErr').textContent = '';
+  $('resultsCard').classList.add('hide');
+  $('videoCard').classList.add('hide');
+  $('evalCard').classList.add('hide');
+  $('evalOut').innerHTML = '';
+  $('log').textContent = '';
+  $('progressCard').classList.remove('hide');
+  $('runBtn').disabled = true;
+
+  const body = {
+    video: $('video').value,
+    frame_stride: parseInt($('stride').value, 10) || 4,
+    draw_overlay: $('overlay').checked,
+    chatting: $('chatting').checked,
+    fixture_filter: $('fixture').checked,
+    device: $('device').value,
+  };
+  const r = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    $('runErr').textContent = data.error;
+    $('runBtn').disabled = false;
+    $('progressCard').classList.add('hide');
+    return;
+  }
+  jobId = data.id;
+  poller = setInterval(poll, 1000);
+  poll();
+});
+
+async function poll() {
+  const r = await fetch(`/api/jobs/${jobId}`);
+  const j = await r.json();
+  if (!r.ok) return;
+
+  $('progressBar').style.width = j.percent + '%';
+  $('progressPct').textContent = Math.round(j.percent) + '%';
+  $('progressLabel').textContent =
+    j.status === 'running'
+      ? `Analysing ${j.video} — frame ${j.frames_done.toLocaleString()} of ${j.frames_total.toLocaleString()}`
+      : j.status === 'queued' ? 'Loading models…'
+      : j.status === 'done' ? `Finished in ${j.started_at} → ${j.finished_at}`
+      : 'Failed';
+  $('log').textContent = j.log.join('\n');
+  $('log').scrollTop = $('log').scrollHeight;
+
+  if (j.status === 'done' || j.status === 'error') {
+    clearInterval(poller);
+    $('runBtn').disabled = false;
+    if (j.status === 'error') $('runErr').textContent = j.error;
+    else render(j);
+  }
+}
+
+// ── Results ─────────────────────────────────────────────────────────
+const LABEL = { cell_phone: 'Phone', laptop: 'Laptop', chatting: 'Chatting' };
+const fmt = (s) => {
+  const m = Math.floor(s / 60), sec = (s % 60).toFixed(1).padStart(4, '0');
+  return `${m}:${sec}`;
+};
+
+function render(j) {
+  const s = j.summary;
+  $('resultsCard').classList.remove('hide');
+
+  const counts = s.counts || {};
+  $('stats').innerHTML = [
+    ['Events', s.events.length],
+    ['Phone', counts.cell_phone || 0],
+    ['Laptop', counts.laptop || 0],
+    ['Chatting', counts.chatting || 0],
+    ['Clip length', fmt(s.duration_sec)],
+  ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+
+  const tb = $('events');
+  tb.innerHTML = s.events.map((e, i) => `
+    <tr data-t="${e.start_sec}">
+      <td>${i + 1}</td>
+      <td><span class="tag ${e.subtype}">${LABEL[e.subtype] || e.subtype}</span></td>
+      <td>${fmt(e.start_sec)}</td>
+      <td>${fmt(e.end_sec)}</td>
+      <td>${e.duration_sec.toFixed(1)}s</td>
+      <td>${e.track_id ?? '—'}</td>
+      <td>${e.confidence.toFixed(2)}</td>
+    </tr>`).join('');
+  $('noEvents').classList.toggle('hide', s.events.length > 0);
+
+  tb.querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => {
+    const p = $('player');
+    if (!p.src) return;
+    p.currentTime = parseFloat(tr.dataset.t);
+    p.play();
+    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
+
+  const f = s.files || {};
+  $('links').innerHTML = [
+    f.events_csv ? `<a href="${f.events_csv}" download>Download events.csv</a>` : '',
+    f.metrics_json ? `<a href="${f.metrics_json}" download>Download metrics.json</a>` : '',
+    f.annotated_video ? `<a href="${f.annotated_video}" download>Download annotated.mp4</a>` : '',
+  ].filter(Boolean).join('');
+
+  if (f.annotated_video) {
+    $('videoCard').classList.remove('hide');
+    $('player').src = f.annotated_video;
+  }
+
+  const v = videos.find(x => x.name === j.video);
+  if (v && v.has_ground_truth) $('evalCard').classList.remove('hide');
+}
+
+// ── Evaluation ──────────────────────────────────────────────────────
+$('evalBtn').addEventListener('click', async () => {
+  $('evalErr').textContent = '';
+  $('evalBtn').disabled = true;
+  const r = await fetch(`/api/jobs/${jobId}/evaluate`, { method: 'POST' });
+  const data = await r.json();
+  $('evalBtn').disabled = false;
+  if (!r.ok) { $('evalErr').textContent = data.error; return; }
+
+  const rows = [];
+  for (const [key, block] of Object.entries(data.by_iou)) {
+    const thr = key.replace('iou_', '');
+    const o = block.overall;
+    rows.push(`<tr>
+      <td>IoU ≥ ${thr}</td>
+      <td>${o.precision.toFixed(2)}</td>
+      <td>${o.recall.toFixed(2)}</td>
+      <td>${o.f1.toFixed(2)}</td>
+      <td>${o.tp} / ${o.fp} / ${o.fn}</td>
+    </tr>`);
+  }
+  $('evalOut').innerHTML = `
+    <div class="tablewrap" style="margin-top:14px">
+      <table>
+        <thead><tr><th>Threshold</th><th>Precision</th><th>Recall</th><th>F1</th><th>TP / FP / FN</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </div>
+    <div class="note">A prediction counts as correct when its time interval overlaps a
+    ground-truth interval by at least the listed fraction.</div>`;
+});
+
+loadVideos();
+</script>
+</body>
+</html>

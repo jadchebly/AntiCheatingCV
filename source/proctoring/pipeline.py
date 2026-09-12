@@ -22,7 +22,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from tqdm import tqdm
 
@@ -89,7 +89,14 @@ def run_video(
     video_path: str | Path,
     output_dir: str | Path,
     config: dict[str, Any],
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> RunSummary:
+    """Process ``video_path`` and write outputs into ``output_dir``.
+
+    ``progress_cb`` is an optional ``(frames_done, frames_total)`` callback
+    invoked once per sampled frame. The web UI uses it to drive a progress bar;
+    the CLI leaves it unset and relies on the tqdm bar.
+    """
     video_path = Path(video_path)
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -216,6 +223,8 @@ def run_video(
                 writer.write(frame)
 
             pbar.update(reader.frame_stride)
+            if progress_cb is not None:
+                progress_cb(min(frame_idx + 1, reader.meta.n_frames), reader.meta.n_frames)
     finally:
         pbar.close()
         reader.close()

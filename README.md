@@ -60,7 +60,8 @@ against ground-truth interval annotations.
 │   │   ├── utils/            # video I/O, visualization
 │   │   ├── pipeline.py       # end-to-end orchestrator
 │   │   └── cli.py            # argparse entry point
-│   ├── scripts/              # convenience wrappers
+│   ├── webui/                # Flask app + single-page front-end
+│   ├── scripts/              # convenience wrappers + UI launcher
 │   ├── configs/default.yaml  # all thresholds, model paths, etc.
 │   ├── requirements.txt
 │   └── environment.yml
@@ -122,6 +123,28 @@ Output files in `outputs/video1/`:
 All thresholds live in [`source/configs/default.yaml`](source/configs/default.yaml)
 — model paths, tile grid, confidence thresholds, fixture-filter parameters,
 chatting heuristic, per-subtype aggregation timing, etc.
+
+## Web UI
+
+A small Flask front-end wraps the same pipeline for demos: pick a clip, watch
+the progress bar, then read the events table and scrub the annotated video.
+
+```bash
+python3 source/scripts/run_ui.py
+```
+
+Open <http://127.0.0.1:5000>. The page lets you:
+
+- pick any clip in `data/raw/`, or upload one from the browser
+- override frame stride, compute device, and the chatting / fixture-filter toggles
+- follow live progress and the pipeline log while the run executes
+- browse detected events and click a row to jump the annotated video to that moment
+- download `events.csv`, `metrics.json`, and `annotated.mp4`
+- score the run against `data/raw/<video>.json` when ground truth exists
+
+Runs are serialised — one video at a time, since the pipeline takes the whole
+GPU. Job state is in memory, so restarting the server clears the history while
+the files under `outputs/` remain.
 
 ## Evaluation
 

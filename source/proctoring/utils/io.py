@@ -71,19 +71,36 @@ class VideoReader:
             self.cap.release()
 
 
+# Tried in order when opening the annotated-video writer. ``avc1`` is H.264,
+# the only one of these that plays inline in a browser, so the web UI gets a
+# working <video> element when the local OpenCV build supports it. ``mp4v``
+# is the universally available fallback.
+FOURCC_PREFERENCE = ("avc1", "mp4v")
+
+
 class VideoWriter:
-    def __init__(self, path: str | Path, fps: float):
+    def __init__(self, path: str | Path, fps: float,
+                 fourcc_preference: tuple[str, ...] = FOURCC_PREFERENCE):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.fps = fps
+        self.fourcc_preference = fourcc_preference
+        self.fourcc_used: str | None = None
         self._writer: cv2.VideoWriter | None = None
 
     def write(self, frame) -> None:
         if self._writer is None:
             h, w = frame.shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            self._writer = cv2.VideoWriter(str(self.path), fourcc, self.fps, (w, h))
-            if not self._writer.isOpened():
+            for code in self.fourcc_preference:
+                writer = cv2.VideoWriter(
+                    str(self.path), cv2.VideoWriter_fourcc(*code), self.fps, (w, h)
+                )
+                if writer.isOpened():
+                    self._writer = writer
+                    self.fourcc_used = code
+                    break
+                writer.release()
+            if self._writer is None:
                 raise RuntimeError(f"failed to open writer: {self.path}")
         self._writer.write(frame)
 
