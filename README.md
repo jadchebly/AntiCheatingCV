@@ -133,7 +133,15 @@ the progress bar, then read the events table and scrub the annotated video.
 python3 source/scripts/run_ui.py
 ```
 
-Open <http://127.0.0.1:5000>. The page lets you:
+It serves on <http://127.0.0.1:8000> and opens a browser window. Override with
+`--port 8080`, and pass `--no-browser` to skip the auto-open. If the port is
+busy the launcher steps up to the next free one and prints where it landed.
+
+> Port 5000 is avoided deliberately. On macOS, Control Center holds that port
+> for AirPlay Receiver, and a browser reaching it instead of Flask shows a
+> blank page.
+
+The page lets you:
 
 - pick any clip in `data/raw/`, or upload one from the browser
 - override frame stride, compute device, and the chatting / fixture-filter toggles

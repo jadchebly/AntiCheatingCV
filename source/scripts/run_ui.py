@@ -2,8 +2,10 @@
 """Launch the local web UI.
 
     python3 source/scripts/run_ui.py
+    python3 source/scripts/run_ui.py --port 8080 --no-browser
 
-Then open http://127.0.0.1:5000 in a browser.
+Serves on http://127.0.0.1:8000 by default and opens a browser window.
+Port 5000 is avoided on purpose: on macOS it belongs to AirPlay Receiver.
 """
 
 import sys

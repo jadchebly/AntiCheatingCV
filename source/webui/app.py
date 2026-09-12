@@ -12,12 +12,15 @@ and restarting the server forgets them. Finished artefacts (``events.csv``,
 
 from __future__ import annotations
 
+import argparse
 import io
 import json
+import socket
 import sys
 import threading
 import traceback
 import uuid
+import webbrowser
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -316,14 +319,66 @@ def serve_output(rel: str):
     return send_from_directory(OUTPUT_DIR, rel, conditional=True)
 
 
-def main() -> int:
+def _port_is_taken(host: str, port: int) -> bool:
+    """True if something already answers on ``port``.
+
+    Deliberately a connect() test rather than a bind() test. On macOS, Control
+    Center (AirPlay Receiver) listens on ``*:5000``, yet binding the narrower
+    ``127.0.0.1:5000`` still succeeds — so a bind test looks clear while the
+    browser, resolving localhost to ::1, reaches AirPlay and renders a blank
+    page. Connecting catches that; binding does not. It is also why the default
+    port below is 8000 and not Flask's usual 5000.
+    """
+    for family, addr in ((socket.AF_INET, ("127.0.0.1", port)),
+                         (socket.AF_INET6, ("::1", port))):
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.settimeout(0.25)
+                if s.connect_ex(addr) == 0:
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def _pick_port(host: str, preferred: int) -> int | None:
+    """Return ``preferred`` if free, else the next free port above it."""
+    for port in range(preferred, preferred + 20):
+        if not _port_is_taken(host, port):
+            return port
+    return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run the proctoring web UI.")
+    parser.add_argument("--port", type=int, default=8000,
+                        help="Port to serve on (default: 8000)")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Interface to bind (default: 127.0.0.1)")
+    parser.add_argument("--no-browser", action="store_true",
+                        help="Do not open a browser window on startup")
+    args = parser.parse_args(argv)
+
+    port = _pick_port(args.host, args.port)
+    if port is None:
+        print(f"[webui] ports {args.port}-{args.port + 19} are all in use; "
+              f"pass --port with a free one", file=sys.stderr)
+        return 1
+    if port != args.port:
+        print(f"[webui] port {args.port} is in use, using {port} instead")
+
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    url = f"http://{args.host}:{port}"
     print(f"[webui] videos   {VIDEO_DIR}")
     print(f"[webui] outputs  {OUTPUT_DIR}")
-    print("[webui] open http://127.0.0.1:5000")
+    print(f"[webui] open {url}")
+
+    if not args.no_browser:
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+
     # threaded=True so status polling stays responsive during a run.
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    app.run(host=args.host, port=port, debug=False, threaded=True)
     return 0
 
 
