@@ -1,0 +1,188 @@
+Assignment Instructions
+In this group project, you will design, implement, and evaluate a real-world computer vision system operating under realistic constraints and environmental conditions.
+The goal is to build a complete, end-to-end solution that:
+Solves a clearly defined real-world problem.
+Operates under realistic acquisition conditions.
+Is robust to noise, variability, and environmental challenges.
+Includes proper quantitative evaluation.
+Demonstrates thoughtful system design and engineering trade-offs.
+Each group must select one of the three project options described below.
+
+General Requirements (Applicable to All Projects)
+Regardless of the selected option:
+The system must be implemented using computer vision techniques. The usage of pre-trained deep learning models is allowed for all projects. The usage of one-shot models is only allowed for Option 1.
+The solution must operate under realistic conditions.
+Students are strongly encouraged to collect their own testing data, even if model pretraining is performed on external data.
+Clear experimental protocols must be defined to ensure reproducibility.
+Code must be modular, well-structured, and documented.
+Installation instructions needs to be provided.
+If the professors is not able to execute your project, you will loose 50% of the credit.
+
+Deliverables (Mandatory for All Projects)
+Each group must submit:
+1. Source Code
+Clean, modular structure
+Installation & execution instructions
+Requirements file, or environment yaml, or dockerfile, or similar.
+
+2. Technical Report
+Problem definition
+System architecture
+Methodology and design decisions
+Experimental setup
+Quantitative evaluation
+Discussion of limitations and improvements
+
+3. Recorded Demonstration Video
+Realistic working scenario
+Clear explanation of pipeline and system behaviour
+
+4. Individual Contribution Statement
+A description of your contribution to the final project
+
+Project Options
+Option 1 – Intelligent Exam Proctoring System
+Objective
+Design and implement a computer vision–based exam proctoring system capable of automatically monitoring students during an in-person exam session.
+The system must operate on images or video captured from a camera positioned to observe a significant portion of the classroom, not a single close-up student.
+The input images are expected to include:
+Multiple students
+Several rows of desks
+Partial occlusions
+Realistic classroom layout
+The system must therefore handle:
+Multi-person detection
+Perspective distortion
+Scale variation
+Partial visibility
+Minimum Requirement (Mandatory): Electronic Device Detection
+The system must:
+Detect unauthorized electronic devices (e.g., mobile phones, tablets, smartwatches, laptops).
+Operate in realistic classroom conditions.
+Detect devices across multiple students in the scene.
+Trigger an alert when a device is detected and write the event to a CSV file including the timestamp of the detection.
+Work in real time is not required, it can be used to process video files rather than a direct stream of video.
+Detection should remain robust despite:
+Small object size (devices may appear small in wide classroom views).
+Partial occlusion by desks or hands.
+Different lighting conditions.
+
+You can use pretrained and one-shot models like the ones included in huggingface.
+
+Additional Objectives (Students Must Implement at Least One)
+Beyond device detection, the system must incorporate at least one additional intelligent monitoring capability, such as:
+Head pose or gaze estimation
+Detect suspicious repeated gaze deviations.
+Talking detection
+Detect suspicious lip movements.
+Object permanence reasoning
+Detect appearance/disappearance of forbidden objects.
+Behavioural anomaly detection
+Identify unusual motion patterns.
+Any other task in line with the above
+
+Students are encouraged to think beyond simple object detection and design a more complete monitoring system.
+
+Suggestion: Students may consider using pose estimation or pose tracking algorithms (e.g., body or hand keypoint detection) to monitor hand movements, body posture changes, or suspicious behaviours in addition to object detection.
+
+Data Collection Requirements
+The classroom setup must simulate a realistic exam environment.
+The camera must capture a wide field of view including several students.
+Students must collect their own evaluation data.
+External datasets may be used for pretraining models.
+It is strongly recommended that groups:
+Record training/validation data under controlled conditions.
+Always collect separate testing data independently to evaluate generalization.
+
+Evaluation Criteria
+True and False positive rate
+Performance under small-object conditions
+Multi-person robustness
+Quality of recorded dataset
+Quality of quantitative analysis
+
+Option 2 – Fast Image Search Tool
+Project Description
+In this group project, students will design and implement a high-performance image search engine for place recognition in the IE Tower. The system must be capable of retrieving the most relevant images of a location from a database given a query image, with a strong emphasis on search speed and recognition accuracy. The system should also indicate the location of the query image in the Tower.
+
+Objectives
+The main objectives of this project are:
+To develop an end-to-end image retrieval system for visual place recognition.
+To apply and compare different computer vision and image representation techniques.
+To analyse the trade-off between accuracy, robustness, and computational performance.
+To gain experience in dataset acquisition, system evaluation, and experimental comparison.
+
+Data Acquisition
+Students are required to capture their own image dataset in the IE Tower area.
+The dataset should:
+Cover multiple viewpoints, scales, and lighting conditions.
+Include intra-class variability (same place under different conditions).
+Be properly organized and documented.
+The use of external datasets is not allowed, except for pre-training when justified.
+
+System Requirements
+The developed system must:
+Accept a query image and return the most similar images and the recognized location.
+Use feature extraction, description, and matching or embedding-based retrieval techniques.
+Be optimized for fast search and scalability.
+Allow fair comparison between at least two different methods (e.g., classical local features vs. deep learning–based descriptors, contrastive-learning, etc.).
+
+Evaluation
+The system will be evaluated using quantitative performance metrics, which may include:
+Retrieval accuracy (e.g., Top-K accuracy, precision, recall, mAP).
+Query time and overall latency.
+Quality of recorded dataset
+Memory usage and computational cost.
+Clear experimental protocols must be defined to ensure reproducibility.
+
+Comparative Analysis
+A key part of the project is the comparison of different approaches. Students should:
+Justify design choices.
+Analyse strengths and weaknesses of each method.
+Discuss performance trade-offs in terms of speed vs. accuracy.
+
+Option 3 – Driver Fatigue Detection with Gesture-Based Activation
+Objective
+The objective of this group project is to design and implement a computer vision system for driver fatigue detection. The system must include a gesture-based activation mechanism and operate using images or video captured inside a stationary vehicle.
+
+General Requirements
+The project must be implemented using computer vision techniques.
+The system must work in realistic conditions, simulating an in-car monitoring scenario.
+No real driving is allowed during data acquisition or testing.
+
+System Requirements
+1. Gesture-Based Activation (Mandatory)
+The fatigue detection system must remain inactive by default.
+The system must only activate after the user correctly performs a predefined sequence of gestures or shapes in front of the camera.
+The gesture sequence must:
+Contain at least two different gestures.
+Be recognized in the correct order.
+Be completed within a limited time window.
+If the sequence is incorrect, the system must remain inactive.
+
+2. Driver Fatigue Detection (Mandatory)
+Once activated, the system must detect driver fatigue or drowsiness using visual cues, such as:
+Eye closure or blink duration
+Yawning
+Head pose changes
+Facial expressions related to fatigue
+Students may implement:
+a classical pipeline (traditional computer vision + machine learning),
+a modern pipeline (deep learning–based methods),
+or both (recommended for maximum grade).
+
+Data Acquisition Constraints
+All images and videos must be captured inside a parked vehicle.
+The student(s) must be seated in the driver’s position.
+The camera position should mimic a real in-car camera setup.
+External datasets may be used only for pretraining, not as final evaluation data.
+
+Evaluation Criteria
+The project will be evaluated based on:
+Correct implementation of the gesture-based activation
+Effectiveness and robustness of fatigue detection
+Technical complexity and correctness
+Use of appropriate computer vision techniques
+Realism of the experimental setup
+Quality of the report and demonstration video
+Bonus for hybrid or advanced approaches

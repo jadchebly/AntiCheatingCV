@@ -1,0 +1,83 @@
+# Proctoring pipeline configuration.
+
+device:
+  preference: auto    # 'cuda' | 'mps' | 'cpu' | 'auto'
+
+models:
+  detector_weights: models/yolo11l.pt
+  pose_weights: models/yolo11m-pose.pt
+  imgsz: 1280
+
+# COCO class indices used as device classes.
+device_classes:
+  cell_phone: 67
+  laptop: 63
+
+person_class: 0
+
+detection:
+  conf_threshold: 0.15
+  iou_threshold: 0.5
+  device_min_area_px: 50
+  # Tiled inference: split frame into tiles_x * tiles_y tiles with overlap_frac
+  # overlap. Improves small-object recall (phones in back rows). Set tiles_x = 1
+  # to disable.
+  tiles_x: 2
+  tiles_y: 2
+  tile_overlap_frac: 0.20
+
+tracking:
+  tracker: bytetrack.yaml
+  persist: true
+
+processing:
+  # Process every Nth frame. With 30 fps source and stride=4, effective rate ~7.5 fps.
+  frame_stride: 4
+
+# Static-fixture filter: suppress device clusters that hit the same pixel location
+# repeatedly (desk grommets, power outlets, etc.). Without this, the COCO model
+# locks onto small static features and emits sustained false alarms.
+fixture_filter:
+  enabled: true
+  cluster_radius_px: 18.0
+  min_count_to_lock: 6
+  min_lifetime_sec: 6.0
+
+# Wrist-aware association: prefer the tracked person whose wrist is nearest to a
+# device. Used as a confidence boost, not a hard filter, so a phone clearly on a
+# desk is still detected even if the nearest hand is briefly out of frame.
+association:
+  wrist_max_dist_px: 250
+  wrist_conf_min: 0.30
+  body_max_dist_px: 400      # body-centre fallback when no wrist passes
+
+# Chatting heuristic.
+chatting:
+  enabled: true
+  # Centre-to-centre distance between two people, expressed in average shoulder
+  # widths. ~2.5 shoulder-widths ≈ adjacent seats.
+  proximity_max_shoulder_widths: 2.5
+  # Each person's nose direction (relative to shoulder midpoint) must point toward
+  # the other within this many degrees of "directly facing". Stricter is safer —
+  # the heuristic is noisy on small back-row faces.
+  facing_tolerance_deg: 30.0
+  min_pose_conf: 0.30
+
+# Per-subtype event aggregation. Per-frame booleans are merged into intervals;
+# gaps shorter than gap_tolerance_sec are bridged, intervals shorter than
+# min_duration_sec are dropped.
+aggregation:
+  gap_tolerance_sec:
+    cell_phone: 1.5
+    laptop: 2.5
+    chatting: 1.5
+  min_duration_sec:
+    cell_phone: 1.5
+    laptop: 3.0
+    chatting: 3.0
+
+output:
+  events_filename: events.csv
+  video_filename: annotated.mp4
+  metrics_filename: metrics.json
+  draw_overlay: true
