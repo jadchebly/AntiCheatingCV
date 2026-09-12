@@ -141,9 +141,10 @@ def run_video(
     chat: ChattingDetector | None = None
     if chat_cfg.get("enabled", True):
         chat = ChattingDetector(
-            proximity_max_shoulder_widths=chat_cfg.get("proximity_max_shoulder_widths", 3.0),
-            facing_tolerance_deg=chat_cfg.get("facing_tolerance_deg", 50.0),
+            proximity_max_shoulder_widths=chat_cfg.get("proximity_max_shoulder_widths", 2.5),
+            min_head_turn_ratio=chat_cfg.get("min_head_turn_ratio", 0.15),
             min_pose_conf=chat_cfg.get("min_pose_conf", 0.3),
+            min_consecutive_frames=chat_cfg.get("min_consecutive_frames", 2),
         )
 
     aggregator = EventAggregator(

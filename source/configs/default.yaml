@@ -57,11 +57,15 @@ chatting:
   # Centre-to-centre distance between two people, expressed in average shoulder
   # widths. ~2.5 shoulder-widths ≈ adjacent seats.
   proximity_max_shoulder_widths: 2.5
-  # Each person's nose direction (relative to shoulder midpoint) must point toward
-  # the other within this many degrees of "directly facing". Stricter is safer —
-  # the heuristic is noisy on small back-row faces.
-  facing_tolerance_deg: 30.0
+  # Head yaw, measured as how far the nose has slid along the shoulder axis,
+  # in units of half a shoulder width. 0 is looking straight ahead, 1 puts the
+  # nose over a shoulder. Both people must be turned toward each other by at
+  # least this much. Raise it to demand a more deliberate turn.
+  min_head_turn_ratio: 0.15
   min_pose_conf: 0.30
+  # Frames a pair must hold the geometry before it counts, which drops
+  # single-frame pose noise. Counted in sampled frames, not source frames.
+  min_consecutive_frames: 2
 
 # Per-subtype event aggregation. Per-frame booleans are merged into intervals;
 # gaps shorter than gap_tolerance_sec are bridged, intervals shorter than

@@ -205,7 +205,7 @@ A previous group built a similar system; the report is at
 | Tiled inference | 2×2 | 2×2 with 20% overlap and per-class NMS |
 | Static-fixture suppression | — | **`SpatialFixtureFilter`** (kills sustained FPs on desk grommets / outlets) |
 | Person-device association | (unspecified) | **Wrist-aware** primary path with body-centre fallback |
-| Chatting heuristic | proximity + facing | proximity (in shoulder-widths) + mutual-facing within stricter tolerance |
+| Chatting heuristic | proximity + facing | proximity (in shoulder-widths) + mutual head-yaw, measured by projecting the nose onto the shoulder axis so the vertical nose offset cannot swamp the turn signal |
 | Evaluation | temporal IoU @ 0.3 | temporal IoU at **{0.1, 0.3, 0.5}** for sensitivity reporting |
 
 Quantitative comparison numbers are in [`report/report.md`](report/report.md).
