@@ -20,6 +20,8 @@ import numpy as np
 
 # Indices we use elsewhere.
 NOSE = 0
+LEFT_EYE, RIGHT_EYE = 1, 2
+LEFT_EAR, RIGHT_EAR = 3, 4
 LEFT_SHOULDER, RIGHT_SHOULDER = 5, 6
 LEFT_WRIST, RIGHT_WRIST = 9, 10
 

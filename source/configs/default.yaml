@@ -16,7 +16,10 @@ device_classes:
 person_class: 0
 
 detection:
-  conf_threshold: 0.15
+  # Detections below this never reach the aggregator. 0.15 admitted so much
+  # junk that nearly every false positive in a run sat under 0.30, so the floor
+  # is raised; the postprocess pass below then screens on the event mean.
+  conf_threshold: 0.25
   iou_threshold: 0.5
   device_min_area_px: 50
   # Tiled inference: split frame into tiles_x * tiles_y tiles with overlap_frac
@@ -78,7 +81,29 @@ aggregation:
   min_duration_sec:
     cell_phone: 1.5
     laptop: 3.0
-    chatting: 3.0
+    # Was 3.0, which a short clip cannot satisfy — a 3.3 s sample needed the
+    # event to span 90% of the footage. The detector's own consecutive-frame
+    # gate already screens single-frame noise, so this need not do it twice.
+    chatting: 1.5
+
+# Post-run screening, written to events_filtered.csv alongside the raw
+# events.csv. Drops events whose mean confidence is below the per-subtype floor,
+# then drops whole tracks that emit many events inside a tight spatial cluster
+# (a "ghost" — a static region the detector keeps re-tagging).
+postprocess:
+  enabled: true
+  # Swept against the sample clips: false positives landed at 0.30-0.37 while
+  # genuine detections landed at 0.63-0.69. Results plateau from 0.40 up, so
+  # this sits at the start of the plateau rather than tight against the data.
+  min_mean_conf:
+    cell_phone: 0.40
+    laptop: 0.40
+    chatting: 0.0     # chatting carries no detector score, so no floor applies
+  ghost_max_span_px: 60.0
+  ghost_max_events: 4
+  # Same-subtype events closer together than this are treated as one incident
+  # reported twice, which is what a track-ID reassignment produces.
+  merge_bridge_sec: 1.0
 
 output:
   events_filename: events.csv

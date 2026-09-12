@@ -173,6 +173,10 @@
 <!-- ── Step 3: results ───────────────────────────────────────────── -->
 <section class="card hide" id="resultsCard">
   <h2>3 &nbsp;Results</h2>
+  <div class="checks" style="margin:0 0 14px">
+    <label><input type="checkbox" id="highConf" checked> Screened (hide likely false positives)</label>
+  </div>
+  <div class="note" id="filterNote" style="margin:0 0 14px"></div>
   <div class="stats" id="stats"></div>
 
   <div class="tablewrap">
@@ -330,43 +334,18 @@ const fmt = (s) => {
   return `${m}:${sec}`;
 };
 
+let lastSummary = null;
+
 function render(j) {
-  const s = j.summary;
+  lastSummary = j.summary;
   $('resultsCard').classList.remove('hide');
+  renderTable();
 
-  const counts = s.counts || {};
-  $('stats').innerHTML = [
-    ['Events', s.events.length],
-    ['Phone', counts.cell_phone || 0],
-    ['Laptop', counts.laptop || 0],
-    ['Chatting', counts.chatting || 0],
-    ['Clip length', fmt(s.duration_sec)],
-  ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
-
-  const tb = $('events');
-  tb.innerHTML = s.events.map((e, i) => `
-    <tr data-t="${e.start_sec}">
-      <td>${i + 1}</td>
-      <td><span class="tag ${e.subtype}">${LABEL[e.subtype] || e.subtype}</span></td>
-      <td>${fmt(e.start_sec)}</td>
-      <td>${fmt(e.end_sec)}</td>
-      <td>${e.duration_sec.toFixed(1)}s</td>
-      <td>${e.track_id ?? '—'}</td>
-      <td>${e.confidence.toFixed(2)}</td>
-    </tr>`).join('');
-  $('noEvents').classList.toggle('hide', s.events.length > 0);
-
-  tb.querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => {
-    const p = $('player');
-    if (!p.src) return;
-    p.currentTime = parseFloat(tr.dataset.t);
-    p.play();
-    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }));
-
+  const s = j.summary;
   const f = s.files || {};
   $('links').innerHTML = [
-    f.events_csv ? `<a href="${f.events_csv}" download>Download events.csv</a>` : '',
+    f.events_filtered_csv ? `<a href="${f.events_filtered_csv}" download>Download screened events.csv</a>` : '',
+    f.events_csv ? `<a href="${f.events_csv}" download>Download raw events.csv</a>` : '',
     f.metrics_json ? `<a href="${f.metrics_json}" download>Download metrics.json</a>` : '',
     f.annotated_video ? `<a href="${f.annotated_video}" download>Download annotated.mp4</a>` : '',
   ].filter(Boolean).join('');
@@ -378,6 +357,55 @@ function render(j) {
 
   const v = videos.find(x => x.name === j.video);
   if (v && v.has_ground_truth) $('evalCard').classList.remove('hide');
+}
+
+$('highConf').addEventListener('change', renderTable);
+
+function renderTable() {
+  const s = lastSummary;
+  if (!s) return;
+
+  // The screened list is what the postprocess pass kept; the raw list is every
+  // interval the aggregator emitted, false positives included.
+  const screened = $('highConf').checked && Array.isArray(s.filtered_events);
+  const events = screened ? s.filtered_events : s.events;
+  const counts = (screened ? s.filtered_counts : s.counts) || {};
+
+  const removed = (s.events || []).length - (s.filtered_events || []).length;
+  $('filterNote').textContent = screened
+    ? (removed > 0
+        ? `Hiding ${removed} low-confidence or repeated-ghost detection${removed === 1 ? '' : 's'}. Untick to see everything.`
+        : 'Nothing was screened out of this run.')
+    : `Showing all ${(s.events || []).length} raw detections, including likely false positives.`;
+
+  $('stats').innerHTML = [
+    ['Events', events.length],
+    ['Phone', counts.cell_phone || 0],
+    ['Laptop', counts.laptop || 0],
+    ['Chatting', counts.chatting || 0],
+    ['Clip length', fmt(s.duration_sec)],
+  ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+
+  const tb = $('events');
+  tb.innerHTML = events.map((e, i) => `
+    <tr data-t="${e.start_sec}">
+      <td>${i + 1}</td>
+      <td><span class="tag ${e.subtype}">${LABEL[e.subtype] || e.subtype}</span></td>
+      <td>${fmt(e.start_sec)}</td>
+      <td>${fmt(e.end_sec)}</td>
+      <td>${e.duration_sec.toFixed(1)}s</td>
+      <td>${e.track_id ?? '—'}</td>
+      <td>${e.confidence.toFixed(2)}</td>
+    </tr>`).join('');
+  $('noEvents').classList.toggle('hide', events.length > 0);
+
+  tb.querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => {
+    const p = $('player');
+    if (!p.src) return;
+    p.currentTime = parseFloat(tr.dataset.t);
+    p.play();
+    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
 }
 
 // ── Evaluation ──────────────────────────────────────────────────────

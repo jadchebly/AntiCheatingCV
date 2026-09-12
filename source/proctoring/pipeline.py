@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -31,6 +31,7 @@ from proctoring.behaviour.aggregation import Event, EventAggregator
 from proctoring.behaviour.chatting import ChattingDetector
 from proctoring.detection.detector import Detection, DeviceDetector
 from proctoring.detection.fixture_filter import SpatialFixtureFilter
+from proctoring.evaluation.postprocess import filter_run
 from proctoring.tracking.pose_tracker import PoseTracker, TrackedPerson
 from proctoring.utils import visualization as viz
 from proctoring.utils.io import VideoReader, VideoWriter, select_device
@@ -44,6 +45,10 @@ class RunSummary:
     effective_fps: float
     events: list[dict]
     fixture_clusters: list[tuple[str, float, float, int]]
+    # Events surviving the confidence/ghost pass, plus what it removed. Empty
+    # and zeroed when postprocessing is disabled.
+    filtered_events: list[dict] = field(default_factory=list)
+    postprocess_stats: dict[str, Any] = field(default_factory=dict)
 
 
 def _associate_device_to_person(
@@ -131,11 +136,24 @@ def run_video(
     fixture_cfg = config.get("fixture_filter", {})
     fixture: SpatialFixtureFilter | None = None
     if fixture_cfg.get("enabled", True):
+        # The radius default was tuned at 1080p. Left absolute, a 4K frame gets a
+        # cluster four times too tight, so a static false positive whose centre
+        # jitters by a few dozen pixels splits across clusters and never locks.
+        radius = float(fixture_cfg.get("cluster_radius_px", 18.0))
+        radius *= max(1.0, reader.meta.width / 1920.0)
+        # A fixture has to persist to count, but a fixed 6 s floor exceeds a
+        # short clip outright and makes the filter inert on it. Clamp against
+        # the footage we actually have.
+        lifetime = float(fixture_cfg.get("min_lifetime_sec", 6.0))
+        if reader.meta.duration_sec > 0:
+            lifetime = min(lifetime, 0.4 * reader.meta.duration_sec)
         fixture = SpatialFixtureFilter(
-            cluster_radius_px=fixture_cfg.get("cluster_radius_px", 18.0),
+            cluster_radius_px=radius,
             min_count_to_lock=fixture_cfg.get("min_count_to_lock", 6),
-            min_lifetime_sec=fixture_cfg.get("min_lifetime_sec", 6.0),
+            min_lifetime_sec=lifetime,
         )
+        print(f"[proctoring] fixture filter: radius={radius:.0f}px "
+              f"lifetime={lifetime:.1f}s")
 
     chat_cfg = config.get("chatting", {})
     chat: ChattingDetector | None = None
@@ -235,6 +253,26 @@ def run_video(
     events = aggregator.flush()
     write_events_csv(events_csv, events)
 
+    # Confidence floor + ghost-track suppression. This used to exist only as a
+    # separate CLI step nothing invoked, so every consumer saw the raw list with
+    # its low-confidence false positives still in it.
+    pp_cfg = config.get("postprocess", {})
+    filtered_rows: list[dict] = []
+    pp_stats: dict[str, Any] = {}
+    if pp_cfg.get("enabled", True):
+        pp_stats = filter_run(
+            out_dir,
+            min_mean_conf=pp_cfg.get("min_mean_conf"),
+            ghost_max_span_px=pp_cfg.get("ghost_max_span_px", 60.0),
+            ghost_max_events=pp_cfg.get("ghost_max_events", 4),
+            merge_bridge_sec=pp_cfg.get("merge_bridge_sec", 1.0),
+        )
+        filtered_rows = _read_filtered(out_dir / "events_filtered.csv")
+        print(f"[proctoring] postprocess: {pp_stats['n_input']} -> "
+              f"{pp_stats['n_output']} events "
+              f"(dropped {pp_stats['n_dropped_low_confidence']} low-confidence, "
+              f"{pp_stats['n_dropped_ghost_tracks']} ghost)")
+
     summary = RunSummary(
         video=str(video_path),
         duration_sec=reader.meta.duration_sec,
@@ -252,6 +290,8 @@ def run_video(
             for e in sorted(events, key=lambda e: e.start_sec)
         ],
         fixture_clusters=fixture.locked_clusters() if fixture is not None else [],
+        filtered_events=filtered_rows,
+        postprocess_stats=pp_stats,
     )
     with open(metrics_path, "w") as f:
         json.dump({
@@ -260,14 +300,37 @@ def run_video(
             "n_frames_processed": summary.n_frames_processed,
             "effective_fps": summary.effective_fps,
             "n_events": len(events),
+            "n_events_filtered": len(filtered_rows),
+            "postprocess": pp_stats,
             "events_by_subtype": _count_by_subtype(events),
             "events": summary.events,
+            "filtered_events": summary.filtered_events,
             "fixture_clusters": [
                 {"class_name": c, "cx": cx, "cy": cy, "count": n}
                 for (c, cx, cy, n) in summary.fixture_clusters
             ],
         }, f, indent=2)
     return summary
+
+
+def _read_filtered(path: Path) -> list[dict]:
+    """Read events_filtered.csv back into the same shape as RunSummary.events."""
+    if not path.exists():
+        return []
+    import csv
+    rows: list[dict] = []
+    with open(path, "r") as f:
+        for r in csv.DictReader(f):
+            tid = r.get("track_id") or ""
+            rows.append({
+                "subtype": r["subtype"],
+                "start_sec": float(r["start_sec"]),
+                "end_sec": float(r["end_sec"]),
+                "duration_sec": float(r["duration_sec"]),
+                "track_id": int(tid) if tid else None,
+                "confidence": float(r["mean_confidence"] or 0.0),
+            })
+    return rows
 
 
 def _count_by_subtype(events: list[Event]) -> dict[str, int]:

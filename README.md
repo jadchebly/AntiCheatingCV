@@ -116,9 +116,15 @@ python3 source/scripts/run_proctoring.py \
 
 Output files in `outputs/video1/`:
 
-- `events.csv` — assignment-mandated alert log (one row per merged event interval)
+- `events.csv` — raw alert log, one row per aggregated interval
+- `events_filtered.csv` — the same log after screening: a per-subtype confidence
+  floor, ghost-track suppression, and merging of overlapping same-subtype
+  intervals (one incident re-emitted under several track IDs collapses to one row)
 - `annotated.mp4` — annotated demonstration video
-- `metrics.json` — run summary + raw event list
+- `metrics.json` — run summary + both event lists
+
+On the sample clips the screening pass takes 14 raw events down to 4, keeping
+every true violation.
 
 All thresholds live in [`source/configs/default.yaml`](source/configs/default.yaml)
 — model paths, tile grid, confidence thresholds, fixture-filter parameters,
@@ -205,7 +211,7 @@ A previous group built a similar system; the report is at
 | Tiled inference | 2×2 | 2×2 with 20% overlap and per-class NMS |
 | Static-fixture suppression | — | **`SpatialFixtureFilter`** (kills sustained FPs on desk grommets / outlets) |
 | Person-device association | (unspecified) | **Wrist-aware** primary path with body-centre fallback |
-| Chatting heuristic | proximity + facing | proximity (in shoulder-widths) + mutual head-yaw, measured by projecting the nose onto the shoulder axis so the vertical nose offset cannot swamp the turn signal |
+| Chatting heuristic | proximity + facing | proximity (in shoulder-widths) + mutual head-yaw read from where the nose sits between the eyes, which is head-local and so immune to the shoulder tilt that any body-referenced measure picks up |
 | Evaluation | temporal IoU @ 0.3 | temporal IoU at **{0.1, 0.3, 0.5}** for sensitivity reporting |
 
 Quantitative comparison numbers are in [`report/report.md`](report/report.md).

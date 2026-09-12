@@ -163,6 +163,9 @@ def _run_job(job: Job, video_path: Path, out_dir: Path, overrides: dict[str, Any
                     "effective_fps": round(summary.effective_fps, 2),
                     "events": summary.events,
                     "counts": _count_subtypes(summary.events),
+                    "filtered_events": summary.filtered_events,
+                    "filtered_counts": _count_subtypes(summary.filtered_events),
+                    "postprocess": summary.postprocess_stats,
                     "n_fixture_clusters": len(summary.fixture_clusters),
                     "files": _artifact_links(out_dir),
                 }
@@ -192,6 +195,7 @@ def _artifact_links(out_dir: Path) -> dict[str, str | None]:
     links: dict[str, str | None] = {}
     for key, name in (
         ("events_csv", "events.csv"),
+        ("events_filtered_csv", "events_filtered.csv"),
         ("annotated_video", "annotated.mp4"),
         ("metrics_json", "metrics.json"),
     ):

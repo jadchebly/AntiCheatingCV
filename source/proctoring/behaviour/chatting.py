@@ -2,16 +2,17 @@
 
 For each pair of tracked persons in a frame:
 
-1. Compute centre-to-centre distance between their shoulder midpoints,
-   normalised by the average shoulder width across the two. That ratio is a
-   robust per-pair scale that survives perspective distortion.
-2. Estimate each person's head yaw by projecting the nose offset onto their own
-   shoulder axis — see ``_head_yaw`` for why this, and not a raw direction
-   vector, is the right proxy.
+1. Compute the distance between their shoulder midpoints, normalised by the
+   average shoulder width across the two. That ratio is a per-pair scale that
+   survives perspective distortion.
+2. Estimate each person's head yaw from where the nose sits between the eyes —
+   see ``_head_yaw`` for why the face, and not the shoulders, has to supply
+   this.
 3. Require both heads to be turned toward the other person.
 
 A pair-frame fires the chatting flag for *both* track IDs if:
 - proximity (in shoulder-widths) < ``proximity_max_shoulder_widths``, AND
+- the partner sits far enough to one side for "toward" to be meaningful, AND
 - each person's head is yawed toward the other by at least
   ``min_head_turn_ratio``, AND
 - the pair has held for ``min_consecutive_frames`` frames.
@@ -26,16 +27,25 @@ import math
 from dataclasses import dataclass, field
 
 from proctoring.tracking.pose_tracker import (
-    LEFT_SHOULDER,
+    LEFT_EAR,
+    LEFT_EYE,
     NOSE,
-    RIGHT_SHOULDER,
+    RIGHT_EAR,
+    RIGHT_EYE,
     TrackedPerson,
 )
 
-# Below this, the partner sits too close to straight ahead (or straight behind)
-# for a sideways yaw test to mean anything, so the pair is skipped rather than
-# guessed at.
+# Below this share of the centre-to-centre distance, the partner sits too close
+# to directly in front of or behind this person for a sideways yaw test to mean
+# anything, so the pair is skipped rather than guessed at.
 MIN_LATERAL_COMPONENT = 0.30
+
+# A turned head foreshortens the eye pair; past a point the normalisation blows
+# up and the sign gets noisy, so the ratio is capped.
+MAX_YAW = 3.0
+
+# Facial landmarks narrower than this (in pixels) are too small to trust.
+MIN_FACE_HALF_WIDTH_PX = 2.0
 
 
 @dataclass
@@ -43,8 +53,7 @@ class _PersonGeometry:
     track_id: int
     sh_mid: tuple[float, float]
     sh_w: float
-    shoulder_axis: tuple[float, float]  # unit vector, right shoulder -> left
-    yaw: float                          # signed, in half-shoulder-widths
+    yaw: float  # signed; positive means the head is turned toward +x on screen
 
 
 @dataclass
@@ -61,57 +70,47 @@ class ChattingDetector:
         self._streaks.clear()
 
     # ------------------------------------------------------------------
+    def _head_yaw(self, p: TrackedPerson) -> float | None:
+        """Signed head yaw from the face alone, or None if unmeasurable.
+
+        Measured as how far the nose sits from the midpoint of the eyes,
+        horizontally, in units of half the eye separation. ~0 looking straight
+        at the camera, growing toward +/-1 and beyond as the head turns.
+
+        The shoulders cannot supply this. The nose sits well above them, so any
+        shoulder-referenced vector carries a large vertical offset, and once the
+        shoulder line tilts — which it does for every seated student viewed from
+        an angle — that offset leaks into the measurement and swamps the turn.
+        Measured on real footage, shoulder-based yaw identified zero face-to-face
+        pairs because it was reading camera angle rather than head rotation.
+
+        Eyes are used in preference to ears: turning the head occludes the far
+        ear, so ear-based yaw goes undefined in exactly the cases that matter.
+        """
+        for left, right in ((LEFT_EYE, RIGHT_EYE), (LEFT_EAR, RIGHT_EAR)):
+            if min(p.keypoints_conf[left], p.keypoints_conf[right],
+                   p.keypoints_conf[NOSE]) < self.min_pose_conf:
+                continue
+            lx = float(p.keypoints_xy[left, 0])
+            rx = float(p.keypoints_xy[right, 0])
+            half = abs(lx - rx) * 0.5
+            if half < MIN_FACE_HALF_WIDTH_PX:
+                continue
+            nx = float(p.keypoints_xy[NOSE, 0])
+            yaw = (nx - 0.5 * (lx + rx)) / half
+            return max(-MAX_YAW, min(MAX_YAW, yaw))
+        return None
+
     def _geometry(self, p: TrackedPerson) -> _PersonGeometry | None:
         """Per-person geometry, or None when the pose is too weak to use."""
         sh_mid = p.shoulder_mid()
         sh_w = p.shoulder_width()
         if sh_mid is None or sh_w is None or sh_w < 5.0:
             return None
-        if p.keypoints_conf[NOSE] < self.min_pose_conf:
+        yaw = self._head_yaw(p)
+        if yaw is None:
             return None
-
-        lx = float(p.keypoints_xy[LEFT_SHOULDER, 0])
-        ly = float(p.keypoints_xy[LEFT_SHOULDER, 1])
-        rx = float(p.keypoints_xy[RIGHT_SHOULDER, 0])
-        ry = float(p.keypoints_xy[RIGHT_SHOULDER, 1])
-        ax, ay = lx - rx, ly - ry
-        amag = math.hypot(ax, ay)
-        if amag < 1e-3:
-            return None
-        axis = (ax / amag, ay / amag)
-
-        return _PersonGeometry(
-            track_id=p.track_id,
-            sh_mid=sh_mid,
-            sh_w=sh_w,
-            shoulder_axis=axis,
-            yaw=self._head_yaw(p, sh_mid, sh_w, axis),
-        )
-
-    @staticmethod
-    def _head_yaw(
-        p: TrackedPerson,
-        sh_mid: tuple[float, float],
-        sh_w: float,
-        axis: tuple[float, float],
-    ) -> float:
-        """Signed head yaw, in units of half a shoulder width.
-
-        The nose always sits *above* the shoulder midpoint in image
-        coordinates, so a raw (nose - shoulder_mid) direction vector points
-        mostly upward and drags that large constant offset into any angle test
-        against a partner sitting sideways. Projecting onto the shoulder axis
-        discards the vertical component entirely and keeps only the part that
-        encodes an actual head turn: how far the nose has slid toward one
-        shoulder or the other.
-
-        Result is ~0 looking straight ahead, approaching +/-1 when the nose
-        sits over one shoulder. Positive means turned toward the left shoulder.
-        """
-        nx = float(p.keypoints_xy[NOSE, 0]) - sh_mid[0]
-        ny = float(p.keypoints_xy[NOSE, 1]) - sh_mid[1]
-        along = nx * axis[0] + ny * axis[1]
-        return along / (0.5 * sh_w)
+        return _PersonGeometry(track_id=p.track_id, sh_mid=sh_mid, sh_w=sh_w, yaw=yaw)
 
     # ------------------------------------------------------------------
     def detect(self, persons: list[TrackedPerson]) -> dict[int, set[int]]:
@@ -162,16 +161,15 @@ class ChattingDetector:
         if avg_sw <= 0 or (dist / avg_sw) > self.proximity_max_shoulder_widths:
             return False
 
-        d_hat = (dx / dist, dy / dist)
-        return (self._faces(a, d_hat)
-                and self._faces(b, (-d_hat[0], -d_hat[1])))
-
-    def _faces(self, g: _PersonGeometry, to_partner: tuple[float, float]) -> bool:
-        """True when ``g``'s head is turned toward ``to_partner``."""
-        # Which side of this person the partner sits on, along their shoulder axis.
-        lateral = to_partner[0] * g.shoulder_axis[0] + to_partner[1] * g.shoulder_axis[1]
-        if abs(lateral) < MIN_LATERAL_COMPONENT:
+        # "Toward each other" only means something when they sit side by side.
+        if abs(dx) / dist < MIN_LATERAL_COMPONENT:
             return False
+
+        # B is at +x from A, so A must be turned +x and B turned -x.
+        return self._faces(a, dx > 0) and self._faces(b, dx < 0)
+
+    def _faces(self, g: _PersonGeometry, partner_is_right: bool) -> bool:
+        """True when ``g``'s head is turned toward the partner's side."""
         if abs(g.yaw) < self.min_head_turn_ratio:
             return False
-        return (g.yaw > 0) == (lateral > 0)
+        return (g.yaw > 0) == partner_is_right
